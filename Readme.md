@@ -11,7 +11,7 @@ It serves as the **graph intelligence layer** for an AI-powered Jenkins assistan
 ---
 
 
-## 🗂️ Graph Schema
+## Graph Schema
 
 ### Node Types
 
