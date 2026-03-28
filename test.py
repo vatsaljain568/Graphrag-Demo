@@ -39,25 +39,32 @@ def route_query(query: str) -> str:
     return "vector"
 
 # Multi-hop traversal
-def graph_query(G, plugin_name, hops=2):
+def graph_query(G, plugin_name, hops=3, filter_relation=None):
     if plugin_name not in G:
         return []
     paths = nx.single_source_shortest_path(G, plugin_name, cutoff=hops)
     results = []
     for target, path in paths.items():
-        if target != plugin_name:
+        if target != plugin_name and len(path) > 1:
             edges = [(path[i], path[i+1]) for i in range(len(path)-1)]
+            if filter_relation:
+                relations = [G[u][v]['relation'] for u, v in edges]
+                if not any(filter_relation in r for r in relations):
+                    continue
             chain = " → ".join([
                 f"{u} --[{G[u][v]['relation']}]--> {v}"
                 for u, v in edges
             ])
-            results.append(chain)
+
+            if not any(r in chain for r in results):
+                results.append(chain)
+            
     return results
 
 
 # Visual
 def visualize_graph(G):
-    pos = nx.spring_layout(G)
+    pos = nx.spring_layout(G, seed=42)
     nx.draw(G, pos, with_labels=True, node_color="skyblue", font_weight="bold", node_size=1500, font_size=10)
     edge_labels = nx.get_edge_attributes(G, "relation")
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
@@ -70,15 +77,26 @@ queries = [
     "How do I install a plugin?",
 ]
 
+query_filters = {
+    "cve": "HAS_CVE",
+    "conflict": "CONFLICTS_WITH",
+    "depend": "DEPENDS_ON",
+    "security": "HAS_CVE",
+}
+
 for query in queries:
     route = route_query(query)
     print(f"\nQuery: {query}")
     print(f"Router Decision: {route.upper()} path")
     if route == "graph":
-        results = graph_query(G, "blueocean-plugin")
+        filter_rel = next(
+            (v for k, v in query_filters.items() if k in query.lower()),
+            None
+        )
+        results = graph_query(G, "blueocean-plugin", hops=3, filter_relation=filter_rel)
         for r in results:
             print(f"  {r}")
     else:
-        print(" Routed to FAISS vector search")
+        print("  Routed to FAISS vector search")
 
 visualize_graph(G)
